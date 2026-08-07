@@ -1,7 +1,15 @@
+from asyncio import base_events
+from asyncio import base_events
+from asyncio import base_events
+from asyncio import base_events
+from asyncio import base_events
 import logging
 
+# pyrefly: ignore [missing-import]
 from dotenv import load_dotenv
+# pyrefly: ignore [missing-import]
 from livekit import rtc
+# pyrefly: ignore [missing-import]
 from livekit.agents import (
     Agent,
     AgentServer,
@@ -12,6 +20,7 @@ from livekit.agents import (
     inference,
     tokenize,
     room_io,
+    UserInputTranscribedEvent,
 )
 from livekit.plugins import murf, silero, google, deepgram, noise_cancellation
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
@@ -83,16 +92,16 @@ async def my_agent(ctx: JobContext):
     session = AgentSession(
         # Speech-to-text (STT) is your agent's ears, turning the user's speech into text that the LLM can understand
         # See all available models at https://docs.livekit.io/agents/models/stt/
-        stt=deepgram.STT(model="nova-3"),
+        stt=deepgram.STT(model="nova-3", language="multi"),
         # A Large Language Model (LLM) is your agent's brain, processing user input and generating a response
         # See all available models at https://docs.livekit.io/agents/models/llm/
         llm=google.LLM(
-            model="gemini-3.6-flash",
+            model="gemini-3.5-flash-lite",
         ),
         # Text-to-speech (TTS) is your agent's voice, turning the LLM's text into speech that the user can hear
         # See all available models as well as voice selections at https://docs.livekit.io/agents/models/tts/
         tts=murf.TTS(
-            voice="en-IN-anisha",
+            voice="ta-IN-anisha",
             style="Conversation",
             tokenizer=tokenize.basic.SentenceTokenizer(min_sentence_len=2),
             text_pacing=True,
@@ -106,23 +115,30 @@ async def my_agent(ctx: JobContext):
         preemptive_generation=True,
     )
 
-    # To use a realtime model instead of a voice pipeline, use the following session setup instead.
-    # (Note: This is for the OpenAI Realtime API. For other providers, see https://docs.livekit.io/agents/models/realtime/))
-    # 1. Install livekit-agents[openai]
-    # 2. Set OPENAI_API_KEY in .env.local
-    # 3. Add `from livekit.plugins import openai` to the top of this file
-    # 4. Use the following session setup instead of the version above
-    # session = AgentSession(
-    #     llm=openai.realtime.RealtimeModel(voice="marin")
-    # )
+    @session.on("user_input_transcribed")
+    def on_user_input_transcribed(ev: UserInputTranscribedEvent):
+        transcript = ev.transcript.strip().lower()
+        if not transcript:
+            return
 
-    # # Add a virtual avatar to the session, if desired
-    # # For other providers, see https://docs.livekit.io/agents/models/avatar/
-    # avatar = hedra.AvatarSession(
-    #   avatar_id="...",  # See https://docs.livekit.io/agents/models/avatar/plugins/hedra
-    # )
-    # # Start the avatar and wait for it to join
-    # await avatar.start(session, room=ctx.room)
+        # Check for Baloo Thambi 2 script characters (native tamil)
+        has_baloo_thambi_2 = any(ord(c) >= 0x0900 and ord(c) <= 0x092F for c in transcript)
+
+        # Check for common Tanglish/Tamil romanized keywords
+        tamil_keywords = {
+            "vanakkam", "nandri", "epadi", "iniku", "naalaikku", "inaikku", "adutha", "thayyar", "paaru",
+            "nanban", "savaal", "thambi", "anna", "akka", "semma", "enna", "pandhu", "visiri",
+            "gethu", "macha", "machan", "arisi", "pai", "paakkalam", "seri", "sirappu", "romba", "nalladhu", "kannadi"
+        }
+        words = set(transcript.split())
+        has_tamil_words = not words.isdisjoint(tamil_keywords)
+
+        if has_baloo_thambi_2 or has_tamil_words:
+            logger.info(f"Detected Tamil/Tanglish speech: '{ev.transcript}'. Switching TTS to ta-IN-anisha")
+            session.tts.update_options(voice="ta-IN-anisha")
+        else:
+            logger.info(f"Detected English speech: '{ev.transcript}'. Switching TTS to en-IN-anisha")
+            session.tts.update_options(voice="en-IN-anisha")
 
     # Start the session, which initializes the voice pipeline and warms up the models
     await session.start(
