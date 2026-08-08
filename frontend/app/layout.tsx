@@ -3,7 +3,9 @@ import localFont from 'next/font/local';
 import { headers } from 'next/headers';
 import { ThemeProvider } from '@/components/app/theme-provider';
 import { ThemeToggle } from '@/components/app/theme-toggle';
+import { LanguageTranslator } from '@/components/app/language-translator';
 import { cn } from '@/lib/shadcn/utils';
+
 import { getAppConfig, getStyles } from '@/lib/utils';
 import '@/styles/globals.css';
 
@@ -84,6 +86,7 @@ export default async function RootLayout({ children }: RootLayoutProps) {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <LanguageTranslator />
               <span className="hidden md:inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 Live AI Agent
