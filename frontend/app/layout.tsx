@@ -47,7 +47,7 @@ export default async function RootLayout({ children }: RootLayoutProps) {
   const hdrs = await headers();
   const appConfig = await getAppConfig(hdrs);
   const styles = getStyles(appConfig);
-  const { pageTitle, pageDescription, companyName, logo, logoDark } = appConfig;
+  const { pageTitle, pageDescription } = appConfig;
 
   return (
     <html
@@ -71,34 +71,26 @@ export default async function RootLayout({ children }: RootLayoutProps) {
           enableSystem
           disableTransitionOnChange
         >
-          <header className="fixed top-0 left-0 z-50 hidden w-full flex-row justify-between p-6 md:flex">
-            <a
-              target="_blank"
-              rel="noopener noreferrer"
-              href="https://livekit.io"
-              className="scale-100 transition-transform duration-300 hover:scale-110"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={logo} alt={`${companyName} Logo`} className="block size-6 dark:hidden" />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={logoDark ?? logo}
-                alt={`${companyName} Logo`}
-                className="hidden size-6 dark:block"
-              />
-            </a>
-            <span className="text-foreground font-mono text-xs font-bold tracking-wider uppercase">
-              Built with{' '}
-              <a
-                target="_blank"
-                rel="noopener noreferrer"
-                href="https://docs.livekit.io/agents"
-                className="underline underline-offset-4"
-              >
-                LiveKit Agents
-              </a>
-            </span>
+          <header className="fixed top-0 left-0 z-50 flex w-full flex-row items-center justify-between px-6 py-4 backdrop-blur-sm bg-background/60 border-b border-border/40">
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z" fill="currentColor" className="text-primary"/>
+                </svg>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-bold text-foreground leading-tight">Kathirvelan Karthik</span>
+                <span className="text-[10px] text-muted-foreground leading-tight">Digital Financial Assistant</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="hidden md:inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Live AI Agent
+              </span>
+            </div>
           </header>
+
 
           {children}
           <div className="group fixed bottom-0 left-1/2 z-50 mb-2 -translate-x-1/2">

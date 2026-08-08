@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import { PhoneOffIcon, RotateCcwIcon } from 'lucide-react';
 import { AnimatePresence, type MotionProps, motion } from 'motion/react';
 import { useAgent, useSessionContext, useSessionMessages } from '@livekit/components-react';
 import { AgentChatTranscript } from '@/components/agents-ui/agent-chat-transcript';
@@ -9,6 +10,8 @@ import {
   type AgentControlBarControls,
 } from '@/components/agents-ui/agent-control-bar';
 import { Shimmer } from '@/components/ai-elements/shimmer';
+import { AgentStatusDisplay } from '@/components/app/agent-status-display';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/shadcn/utils';
 import { TileLayout } from './tile-view';
 
@@ -181,6 +184,8 @@ export function AgentSessionView_01({
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { state: agentState } = useAgent();
 
+  const isCallEnded = agentState === 'offline';
+
   const controls: AgentControlBarControls = {
     leave: true,
     microphone: true,
@@ -205,8 +210,15 @@ export function AgentSessionView_01({
       {...props}
     >
       <Fade top className="absolute inset-x-4 top-0 z-10 h-40" />
-      {/* transcript */}
 
+      {/* ── Agent Status Display (always visible, top-center) ─────────────── */}
+      <div className="absolute top-0 left-0 right-0 z-20 flex justify-center pt-16 md:pt-20">
+        <div className="bg-card/70 backdrop-blur-md rounded-2xl border border-border px-6 py-3 shadow-lg">
+          <AgentStatusDisplay agentState={agentState} />
+        </div>
+      </div>
+
+      {/* transcript */}
       <div className="absolute top-0 bottom-[135px] flex w-full flex-col md:bottom-[170px]">
         <AnimatePresence>
           {chatOpen && (
@@ -223,6 +235,7 @@ export function AgentSessionView_01({
           )}
         </AnimatePresence>
       </div>
+
       {/* Tile layout */}
       <TileLayout
         chatOpen={chatOpen}
@@ -236,7 +249,41 @@ export function AgentSessionView_01({
         audioVisualizerGridColumnCount={audioVisualizerGridColumnCount}
         audioVisualizerWaveLineWidth={audioVisualizerWaveLineWidth}
       />
-      {/* Bottom */}
+
+      {/* ── Call Ended Overlay ────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {isCallEnded && (
+          <motion.div
+            key="call-ended-overlay"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.4, ease: 'easeOut' }}
+            className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm px-6"
+          >
+            <div className="bg-card border border-border rounded-3xl p-8 text-center shadow-2xl max-w-sm w-full">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
+                <PhoneOffIcon className="h-8 w-8 text-destructive" />
+              </div>
+              <h2 className="text-xl font-bold text-foreground mb-1">Call Ended</h2>
+              <p className="text-sm text-muted-foreground mb-6">
+                Your conversation with Kathirvelan Karthik has ended. Start a new call whenever you
+                are ready.
+              </p>
+              <Button
+                size="lg"
+                className="w-full rounded-full font-semibold gap-2 hover:scale-105 transition-transform"
+                onClick={() => session.start()}
+              >
+                <RotateCcwIcon className="h-4 w-4" />
+                Start Again
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Bottom controls */}
       <motion.div
         {...BOTTOM_VIEW_MOTION_PROPS}
         className="absolute inset-x-3 bottom-0 z-50 md:inset-x-12"
@@ -272,3 +319,5 @@ export function AgentSessionView_01({
     </section>
   );
 }
+
+
