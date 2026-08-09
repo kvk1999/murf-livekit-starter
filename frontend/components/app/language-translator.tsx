@@ -63,7 +63,7 @@ export function LanguageTranslator({ className }: { className?: string }) {
     { code: 'hi', label: 'हिन्दी (Hindi)' },
     { code: 'te', label: 'తెలుగు (Telugu)' },
     { code: 'ml', label: 'മലയാളം (Malayalam)' },
-    { code: 'kn', label: 'கன்னட (Kannada)' },
+    { code: 'kn', label: 'ಕನ್ನಡ (Kannada)' },
     { code: 'mr', label: 'मराठी (Marathi)' },
     { code: 'bn', label: 'বাংলা (Bengali)' },
     { code: 'gu', label: 'ગુજરાતી (Gujarati)' },

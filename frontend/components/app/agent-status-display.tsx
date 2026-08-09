@@ -72,14 +72,20 @@ function ThinkingDots() {
 
 // ── Main AgentStatusDisplay ────────────────────────────────────────────────
 interface AgentStatusDisplayProps {
-  agentState: AgentState;
+  agentState: AgentState | 'offline';
   className?: string;
 }
 
 const STATE_CONFIG: Record<
-  AgentState,
+  AgentState | 'offline',
   { label: string; sublabel: string; badge: string; badgeColor: string }
 > = {
+  disconnected: {
+    label: 'Call ended',
+    sublabel: 'The conversation has finished',
+    badge: 'Offline',
+    badgeColor: 'bg-muted text-muted-foreground border-border',
+  },
   connecting: {
     label: 'Connecting…',
     sublabel: 'Please wait while the agent joins the call',
@@ -116,6 +122,24 @@ const STATE_CONFIG: Record<
     badge: 'Offline',
     badgeColor: 'bg-muted text-muted-foreground border-border',
   },
+  'pre-connect-buffering': {
+    label: '',
+    sublabel: '',
+    badge: '',
+    badgeColor: ''
+  },
+  failed: {
+    label: '',
+    sublabel: '',
+    badge: '',
+    badgeColor: ''
+  },
+  idle: {
+    label: '',
+    sublabel: '',
+    badge: '',
+    badgeColor: ''
+  }
 };
 
 export function AgentStatusDisplay({ agentState, className }: AgentStatusDisplayProps) {
