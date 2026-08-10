@@ -33,7 +33,7 @@ logger = logging.getLogger("agent")
 
 load_dotenv(".env.local")
 
-SYSTEM_PROMPT = """You are an intelligent, friendly, and empowering voice assistant for Indian Local Commerce, dedicated to helping local artisans, MSMEs, street vendors (PM SVANidhi beneficiaries), and self-help groups (SHGs) manage their digital catalogue, take customer orders, and access government support schemes.
+SYSTEM_PROMPT = """You are an intelligent, friendly, and empowering voice assistant for Indian Local Commerce, dedicated to helping local artisans, MSMEs, street vendors (PM SVANidhi beneficiaries), and self-help groups (SHGs) manage their digital catalogue, take customer orders, check live weather for market/transport planning, and access government support schemes.
 
 Caller Memory & Database Tools Rules:
 1. Lookup Caller: Call `lookup_caller` when a user introduces themselves, provides their name, or shares their ID.
@@ -49,10 +49,14 @@ Caller Memory & Database Tools Rules:
    - IF THE CALLER SAYS YES / CONFIRMS: Call `save_caller_info` with `user_consent_confirmed=True`.
    - IF THE CALLER SAYS NO / REFUSES: DO NOT call `save_caller_info` (or pass `user_consent_confirmed=False`). Respect their choice and do not store any record.
 
+Weather & Outdoor Market Planning Rules:
+5. Weather Lookup: Call `get_current_weather` whenever a user asks about current weather, temperature, rain forecasts, or outdoor market/transport conditions for any city (e.g., Chennai, Delhi, Mumbai). Always clearly report the date/time of the observation and handle any service failure gracefully without inventing weather data.
+
 Your key capabilities:
 1. ONDC & Catalogue Management: Help vendors organize catalogues according to ONDC standards.
 2. Order Taking & Billing: Guide buyers and vendors step-by-step through order placement.
-3. Indian Govt Schemes & Offers Guidance: Provide information on PM SVANidhi, PM Vishwakarma, Udyam, etc.
+3. Live Weather Lookup: Check real-time weather conditions for outdoor stall setups and logistics.
+4. Indian Govt Schemes & Offers Guidance: Provide information on PM SVANidhi, PM Vishwakarma, Udyam, etc.
 
 Voice Tone & Guidelines: Be polite, encouraging, and clear. Keep responses brief without markdown, emojis, or special formatting characters."""
 
@@ -60,6 +64,101 @@ Voice Tone & Guidelines: Be polite, encouraging, and clear. Keep responses brief
 class Assistant(Agent):
     def __init__(self) -> None:
         super().__init__(instructions=SYSTEM_PROMPT)
+
+    @function_tool
+    async def get_current_weather(self, context: RunContext, city: str):
+        """Fetch live real-time weather data for a specific city to help street vendors and local commerce sellers plan outdoor markets and delivery logistics.
+
+        Use this tool ONLY when the user asks about live weather, current temperature, rain conditions, or weather-dependent outdoor market conditions for a specified location/city.
+
+        Args:
+            city: The name of the city or location (e.g., 'Chennai', 'Mumbai', 'Delhi', 'Bengaluru').
+        """
+        import json
+        import urllib.parse
+        import urllib.request
+        from datetime import datetime
+
+        logger.info(f"Executing live weather lookup for city: {city}")
+        try:
+            # Step 1: Geocoding via Open-Meteo Geocoding API
+            encoded_city = urllib.parse.quote(city)
+            geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={encoded_city}&count=1&language=en&format=json"
+            
+            req = urllib.request.Request(
+                geo_url,
+                headers={"User-Agent": "VoiceAgentLocalCommerce/1.0"}
+            )
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                geo_data = json.loads(resp.read().decode("utf-8"))
+
+            if not geo_data.get("results"):
+                logger.warning(f"Geocoding lookup returned no results for '{city}'")
+                return f"I could not locate '{city}'. Please check the city name and try again."
+
+            loc = geo_data["results"][0]
+            lat = loc["latitude"]
+            lon = loc["longitude"]
+            location_name = f"{loc.get('name', city)}, {loc.get('country', '')}"
+
+            # Step 2: Fetch current weather metrics from Open-Meteo API
+            weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
+            req_w = urllib.request.Request(
+                weather_url,
+                headers={"User-Agent": "VoiceAgentLocalCommerce/1.0"}
+            )
+            with urllib.request.urlopen(req_w, timeout=5) as resp_w:
+                weather_data = json.loads(resp_w.read().decode("utf-8"))
+
+            curr = weather_data.get("current_weather")
+            if not curr:
+                return f"Weather data is currently unavailable for {location_name}."
+
+            temp = curr.get("temperature")
+            windspeed = curr.get("windspeed")
+            weathercode = curr.get("weathercode")
+            obs_time = curr.get("time", datetime.now().strftime("%Y-%m-%d %H:%M"))
+
+            # Map Weather Codes to friendly descriptions
+            weather_descriptions = {
+                0: "clear sky",
+                1: "mainly clear",
+                2: "partly cloudy",
+                3: "overcast",
+                45: "foggy",
+                48: "depositing rime fog",
+                51: "light drizzle",
+                53: "moderate drizzle",
+                55: "dense drizzle",
+                61: "slight rain",
+                63: "moderate rain",
+                65: "heavy rain",
+                80: "slight rain showers",
+                81: "moderate rain showers",
+                82: "violent rain showers",
+                95: "thunderstorm",
+            }
+            condition = weather_descriptions.get(weathercode, "current conditions")
+
+            report = (
+                f"Live weather update for {location_name} as of {obs_time} (UTC): "
+                f"Temperature is {temp}°C with {condition} and wind speed of {windspeed} km/h."
+            )
+            logger.info(f"Weather lookup successful: {report}")
+            return report
+
+        except urllib.error.URLError as e:
+            logger.error(f"Network timeout or failure while fetching weather for {city}: {e}")
+            return (
+                f"I am sorry, but I am currently unable to fetch live weather data for {city} "
+                f"due to a network service timeout. Please try again in a few moments."
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error in get_current_weather for {city}: {e}")
+            return (
+                f"I encountered an unexpected issue while looking up the weather for {city}. "
+                f"Please verify the location and try asking again."
+            )
 
     @function_tool
     async def lookup_caller(self, context: RunContext, identifier: str):

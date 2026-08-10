@@ -16,6 +16,31 @@ Build a production voice AI agent in 5 minutes. Powered by the fastest TTS on th
 
 ---
 
+## Real-Time Lookup Tool: Live Weather Data (`get_current_weather`)
+
+Our Indian Local Commerce Voice Agent relies on **live weather lookup data** to help street vendors, outdoor artisans, and local logistics workers plan outdoor stalls and delivery schedules effectively.
+
+### Step 1: Mandatory Lookup
+- **Tool**: `get_current_weather(city: str)` in [agent.py](file:///d:/Guvi%20FS%20Programs/markeragent/murf-livekit-starter/backend/src/agent.py#L63).
+- **Purpose**: Essential live weather lookup for outdoor market setup and delivery planning.
+
+### Step 2: Real Data Source
+- Uses real-time public weather data from **[Open-Meteo API](https://open-meteo.com/)** and **Open-Meteo Geocoding API** (no mock/hand-built fallback required).
+
+### Step 3: Tool Description & Triggering
+- **Docstring**: Fully specifies exact usage scenarios (e.g. current temperature, rain conditions, outdoor market planning) to guarantee accurate model invocation and prevent false triggers.
+
+### Step 4: Out-Loud Failure Handling
+- Network timeouts or API errors (e.g., `urllib.error.URLError`) are caught gracefully and returned as spoken text: *"I am sorry, but I am currently unable to fetch live weather data for [city] due to a network service timeout. Please try again in a few moments."*
+
+### Step 5: Data Recency & Timestamping
+- Weather observations explicitly state the exact UTC timestamp of observation (e.g. *"Live weather update for Chennai as of 2026-08-10 12:30 (UTC)..."*).
+
+### Step 6: Live Connection Verification
+- Connect to the agent via LiveKit web frontend or test scripts and ask: *"What's the weather like in Chennai today?"* or *"Can I set up an outdoor stall in Mumbai right now?"*.
+
+---
+
 ## Architecture
 
 ```mermaid

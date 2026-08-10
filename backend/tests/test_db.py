@@ -1,7 +1,9 @@
 import os
 import sys
 import tempfile
+import asyncio
 from db import init_db, get_caller, save_caller
+from agent import Assistant, RunContext
 
 def test_sqlite_memory():
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
@@ -60,5 +62,23 @@ def test_sqlite_memory():
         except Exception:
             pass
 
+async def test_weather_tool():
+    assistant = Assistant()
+    ctx = None  # RunContext is passed by LiveKit runtime during function calls
+    
+    print("\n--- Testing Weather Tool (Valid City: Chennai) ---")
+    weather_res = await assistant.get_current_weather(ctx, "Chennai")
+    print("Result:", weather_res)
+    assert "Chennai" in weather_res
+    assert "as of" in weather_res
+
+    print("\n--- Testing Weather Tool (Invalid City: NonExistentCityX123) ---")
+    invalid_res = await assistant.get_current_weather(ctx, "NonExistentCityX123")
+    print("Result:", invalid_res)
+    assert "could not locate" in invalid_res
+
+    print("ALL WEATHER TOOL TESTS PASSED SUCCESSFULLY!")
+
 if __name__ == "__main__":
     test_sqlite_memory()
+    asyncio.run(test_weather_tool())
