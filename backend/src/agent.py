@@ -28,17 +28,18 @@ from livekit.plugins import murf, silero, google, deepgram, noise_cancellation
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 from db import get_caller, save_caller
-from prompt import SYSTEM_PROMPT
+from prompt import SYSTEM_PROMPT, OUTBOUND_SYSTEM_PROMPT
 
 logger = logging.getLogger("agent")
 
 load_dotenv(".env.local")
 
 
-
 class Assistant(Agent):
-    def __init__(self) -> None:
-        super().__init__(instructions=SYSTEM_PROMPT)
+    def __init__(self, is_outbound: bool = False) -> None:
+        instructions = OUTBOUND_SYSTEM_PROMPT if is_outbound else SYSTEM_PROMPT
+        super().__init__(instructions=instructions)
+
 
     @function_tool
     async def get_current_weather(self, context: RunContext, city: str):
@@ -269,9 +270,12 @@ async def my_agent(ctx: JobContext):
             logger.info(f"Detected English speech: '{ev.transcript}'. Switching TTS to en-IN-anisha")
             session.tts.update_options(voice="en-IN-anisha")
 
+    # Detect if session is an outbound call (via room name or SIP context)
+    is_outbound_call = "outbound" in ctx.room.name.lower() or "sip" in ctx.room.name.lower()
+
     # Start the session, which initializes the voice pipeline and warms up the models
     await session.start(
-        agent=Assistant(),
+        agent=Assistant(is_outbound=is_outbound_call),
         room=ctx.room,
         room_options=room_io.RoomOptions(
             audio_input=room_io.AudioInputOptions(
@@ -287,6 +291,13 @@ async def my_agent(ctx: JobContext):
 
     # Join the room and connect to the user
     await ctx.connect()
+
+    if is_outbound_call:
+        logger.info("Outbound call connected. Speaking mandatory 3-part opening statement...")
+        await session.say(
+            "Hello! This is Namma Kadai Voice Assistant calling from Indian Local Commerce to confirm your product delivery slot and check market weather conditions. If you wish to stop receiving these calls, simply say stop or hang up at any time."
+        )
+
 
 
 if __name__ == "__main__":
