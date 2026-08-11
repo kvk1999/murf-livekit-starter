@@ -1,8 +1,10 @@
-import asyncio
 import argparse
+import asyncio
+import json
+import logging
 import os
 import sys
-import logging
+import uuid
 from dotenv import load_dotenv
 
 load_dotenv(".env.local")
@@ -10,9 +12,11 @@ load_dotenv(".env.local")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("linphone_dialer")
 
+AGENT_NAME = "outbound-agent"
 
-async def dial_linphone(to_username: str, room_name: str = "outbound-room"):
-    """Dial out to a Linphone SIP user via LiveKit SIP outbound trunk."""
+
+async def dial_linphone(to_username: str, room_name: str | None = None):
+    """Dispatch the outbound AI agent worker into a room and trigger the SIP call."""
     try:
         from livekit import api
     except ImportError:
@@ -32,7 +36,7 @@ async def dial_linphone(to_username: str, room_name: str = "outbound-room"):
         logger.error("Missing valid LIVEKIT_SIP_OUTBOUND_TRUNK_ID / SIP_TRUNK_ID in .env.local")
         sys.exit(1)
 
-    # LiveKit SIP Trunk (e.g. linphone-trunk for sip.linphone.org) expects bare username (e.g. 'koushik9900') or phone number ('+1...')
+    # Format SIP target username or phone number
     target = to_username
     if target.startswith("sip:"):
         target = target[4:]
@@ -40,38 +44,42 @@ async def dial_linphone(to_username: str, room_name: str = "outbound-room"):
         target = target.split("@")[0]
     sip_target = target
 
+    actual_room = room_name or f"outbound-{uuid.uuid4().hex[:8]}"
+
     logger.info(f"Connecting to LiveKit: {livekit_url}")
     lk_api = api.LiveKitAPI(livekit_url, api_key, api_secret)
 
-    logger.info(f"Initiating SIP call to '{sip_target}' using trunk '{trunk_id}' in room '{room_name}'...")
     try:
-        req = api.CreateSIPParticipantRequest(
-            sip_trunk_id=trunk_id,
-            sip_call_to=sip_target,
-            room_name=room_name,
-            participant_identity=f"linphone_{to_username.replace('sip:', '').split('@')[0]}",
-            participant_name=f"Linphone User ({to_username})",
+        logger.info(f"Creating room '{actual_room}'...")
+        await lk_api.room.create_room(api.CreateRoomRequest(name=actual_room))
+
+        logger.info(f"Dispatching '{AGENT_NAME}' into room '{actual_room}' to call target '{sip_target}'...")
+        await lk_api.agent_dispatch.create_dispatch(
+            api.CreateAgentDispatchRequest(
+                agent_name=AGENT_NAME,
+                room=actual_room,
+                metadata=json.dumps({"phone_number": sip_target}),
+            )
         )
-        participant = await lk_api.sip.create_sip_participant(req)
-        logger.info(f"✅ Call dispatched successfully! Participant ID: {participant.participant_id}")
+        logger.info(f"✅ AI Agent dispatched successfully to room '{actual_room}'!")
         logger.info("📱 Check your Linphone app now to accept the incoming call!")
     except Exception as e:
-        logger.error(f"❌ Failed to dispatch Linphone call: {e}")
+        logger.error(f"❌ Failed to dispatch outbound agent: {e}")
     finally:
         await lk_api.aclose()
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Dial a Linphone account using LiveKit SIP Outbound Trunk")
+    parser = argparse.ArgumentParser(description="Dial a Linphone account using LiveKit SIP Outbound Trunk and AI Agent Dispatch")
     parser.add_argument(
         "--to", "-t",
         required=True,
-        help="Linphone username (e.g. koushik9900) or full SIP URI (e.g. sip:koushik9900@sip.linphone.org)"
+        help="Linphone username (e.g. koushik9900) or phone number (+91...)"
     )
     parser.add_argument(
         "--room", "-r",
-        default="linphone-call-room",
-        help="LiveKit room name (default: linphone-call-room)"
+        default=None,
+        help="LiveKit room name (default: auto-generated outbound room)"
     )
 
     args = parser.parse_args()

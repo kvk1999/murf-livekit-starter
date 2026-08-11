@@ -1,5 +1,6 @@
 import asyncio
 import argparse
+import json
 import os
 import sys
 import logging
@@ -11,6 +12,8 @@ load_dotenv(".env.local")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("outbound_call")
 
+AGENT_NAME = "outbound-agent"
+
 
 async def dispatch_livekit_sip_call(
     phone_number_or_sip: str,
@@ -18,11 +21,7 @@ async def dispatch_livekit_sip_call(
     trunk_id: str,
     participant_identity: str
 ):
-    """Dispatch an outbound SIP call using LiveKit API.
-    
-    Supports Linphone SIP addresses (e.g. sip:username@sip.linphone.org or raw linphone username)
-    as well as standard E.164 phone numbers (e.g. +919876543210).
-    """
+    """Dispatch an outbound SIP call by dispatching the outbound AI agent into the room."""
     try:
         from livekit import api
     except ImportError:
@@ -37,8 +36,6 @@ async def dispatch_livekit_sip_call(
         logger.error("Missing LIVEKIT_URL, LIVEKIT_API_KEY, or LIVEKIT_API_SECRET in .env.local")
         sys.exit(1)
 
-    # Format destination for LiveKit SIP outbound call
-    # LiveKit SIP Trunk expects bare username (e.g. 'koushik9900') or phone number ('+91...')
     target_address = phone_number_or_sip
     if target_address.startswith("sip:"):
         target_address = target_address[4:]
@@ -48,23 +45,22 @@ async def dispatch_livekit_sip_call(
     logger.info(f"Connecting to LiveKit server at {livekit_url}...")
     lk_api = api.LiveKitAPI(livekit_url, api_key, api_secret)
 
-    logger.info(
-        f"Creating SIP Participant for target '{target_address}' in room '{room_name}' (Trunk ID: {trunk_id})..."
-    )
-    
     try:
-        req = api.CreateSIPParticipantRequest(
-            sip_trunk_id=trunk_id,
-            sip_call_to=target_address,
-            room_name=room_name,
-            participant_identity=participant_identity,
-            participant_name="Customer " + target_address,
+        logger.info(f"Creating room '{room_name}'...")
+        await lk_api.room.create_room(api.CreateRoomRequest(name=room_name))
+
+        logger.info(f"Dispatching '{AGENT_NAME}' to room '{room_name}' to call '{target_address}'...")
+        await lk_api.agent_dispatch.create_dispatch(
+            api.CreateAgentDispatchRequest(
+                agent_name=AGENT_NAME,
+                room=room_name,
+                metadata=json.dumps({"phone_number": target_address}),
+            )
         )
-        participant = await lk_api.sip.create_sip_participant(req)
-        logger.info(f"✅ Outbound SIP call initiated successfully! Participant ID: {participant.participant_id}")
+        logger.info(f"✅ Outbound AI agent dispatched successfully! Room: {room_name}")
         logger.info("📱 Check your Linphone app now to accept the call!")
     except Exception as e:
-        logger.error(f"❌ Failed to create SIP participant: {e}")
+        logger.error(f"❌ Failed to dispatch outbound call: {e}")
     finally:
         await lk_api.aclose()
 
@@ -77,7 +73,7 @@ def main():
         "--to", "-t", "--phone", "-p",
         dest="target",
         required=True,
-        help="Target phone number (e.g. +919876543210) or Linphone address / username (e.g. koushik9900 or sip:koushik9900@sip.linphone.org)"
+        help="Target phone number (e.g. +919876543210) or Linphone address / username (e.g. koushik9900)"
     )
     parser.add_argument(
         "--room", "-r",

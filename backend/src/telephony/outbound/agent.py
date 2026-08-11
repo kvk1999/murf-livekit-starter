@@ -45,11 +45,18 @@ OUTBOUND_TRUNK_ID = os.getenv("LIVEKIT_SIP_OUTBOUND_TRUNK_ID") or os.getenv("LIV
 # Optional — a phone number to transfer people to when they ask for a human.
 TRANSFER_TO_NUMBER = os.getenv("TRANSFER_TO_NUMBER")
 
-# System prompt tailored for local commerce assistant
-SYSTEM_PROMPT = """You are an AI assistant calling on behalf of a local commerce store in India. Introduce yourself immediately and state the purpose of the call. Keep your responses brief, clear, polite, and conversational. If the person wants to speak to a human or transfer, use the transfer_to_human tool. If you reach an answering machine, use the detected_answering_machine tool. When the call is complete, use the end_call tool."""
+# System prompt for Outbound Deadline Reminder
+SYSTEM_PROMPT = """You are an automated Voice AI assistant for the #VoiceForBharat AI Agent Hackathon.
+Your job is to inform callers about the upcoming submission deadline for AI agents.
 
-# The first thing the person hears when they pick up.
-GREETING = "Hello! This is your local commerce store AI assistant calling regarding your recent query or order. How can I help you today?"
+Primary Objective:
+1. Announce: "In your kind information, your submission deadline for agents of AI is 15th August, hurry up! If you want to know more say yes or no"
+2. If the caller says "YES" or asks for more details: Explain that the final submission deadline for the Voice for Bharat AI Agent challenge is August 15th, and they should submit their project details, LinkedIn demo video link, and repository link before the deadline. Ask if they have any questions or need help with submission.
+3. If the caller says "NO" or indicates they don't need details: Thank them politely and use the end_call tool to conclude the call.
+4. Keep all responses brief, friendly, clear, and conversational. No special symbols, markdown formatting, or emojis."""
+
+# The exact opening greeting spoken when the outbound call connects.
+GREETING = "In your kind information, your submission deadline for agents of AI is 15th August, hurry up! If you want to know more say yes or no."
 
 CALLEE_IDENTITY = "phone-user"
 
@@ -201,6 +208,8 @@ async def outbound_agent(ctx: JobContext):
         return
 
     await session_started
+    # Pause briefly after call is answered so SIP audio channel settles and caller hears full greeting
+    await asyncio.sleep(1.5)
     await session.say(GREETING, allow_interruptions=True)
 
 
