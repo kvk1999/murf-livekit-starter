@@ -112,7 +112,7 @@ const STATE_CONFIG: Record<
   },
   speaking: {
     label: 'Agent is speaking',
-    sublabel: 'Kathirvelan Karthik is replying to you',
+    sublabel: 'Namma Kadai Assistant (நம்ம கடை அசிஸ்டன்ட்) is replying to you',
     badge: 'Speaking',
     badgeColor: 'bg-primary/15 text-primary border-primary/30',
   },

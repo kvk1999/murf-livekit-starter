@@ -67,6 +67,7 @@ export function LanguageTranslator({ className }: { className?: string }) {
     { code: 'mr', label: 'मराठी (Marathi)' },
     { code: 'bn', label: 'বাংলা (Bengali)' },
     { code: 'gu', label: 'ગુજરાતી (Gujarati)' },
+    { code: 'pu', label: 'ਪੰਜਾਬੀ (Punjabi)' }
   ];
 
   return (

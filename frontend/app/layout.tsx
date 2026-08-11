@@ -77,12 +77,12 @@ export default async function RootLayout({ children }: RootLayoutProps) {
             <div className="flex items-center gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z" fill="currentColor" className="text-primary"/>
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z" fill="currentColor" className="text-primary" />
                 </svg>
               </div>
               <div className="flex flex-col">
-                <span className="text-sm font-bold text-foreground leading-tight">Kathirvelan Karthik</span>
-                <span className="text-[10px] text-muted-foreground leading-tight">Digital Financial Assistant</span>
+                <span className="text-sm font-bold text-foreground leading-tight">Namma Kadai Assistant</span>
+                <span className="text-[10px] text-muted-foreground leading-tight">Indian Local Commerce Voice Guide</span>
               </div>
             </div>
             <div className="flex items-center gap-3">

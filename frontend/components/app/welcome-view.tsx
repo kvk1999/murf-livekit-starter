@@ -39,11 +39,11 @@ export const WelcomeView = ({
 
         <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-primary/10 border border-primary/20 px-3.5 py-1 text-xs font-semibold text-primary shadow-sm">
           <ShieldCheckIcon className="h-3.5 w-3.5" />
-          Kathirvelan Karthik (கதிர்வேலன் கார்த்திக்)
+          Namma Kadai Assistant (நம்ம கடை அசிஸ்டன்ட்)
         </div>
 
         <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl bg-gradient-to-r from-foreground via-foreground to-foreground/70 bg-clip-text">
-          Digital Financial Assistant
+          Indian Local Commerce Voice Guide
         </h1>
 
         <p className="text-muted-foreground mt-3 max-w-md text-sm sm:text-base leading-relaxed">
