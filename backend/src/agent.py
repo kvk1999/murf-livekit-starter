@@ -199,6 +199,52 @@ class Assistant(Agent):
         )
         return result
 
+    @function_tool
+    async def create_human_escalation(
+        self,
+        context: RunContext,
+        who: str,
+        what: str,
+        checked: str,
+        urgency: str = "medium",
+        language: str = "English",
+        follow_up: str = "phone",
+        user_permission_granted: bool = False,
+    ):
+        """Create a human-help ticket when the agent encounters an issue requiring human intervention.
+
+        IMPORTANT: ALWAYS ask for caller permission first before invoking this tool with user_permission_granted=True!
+        Do NOT include sensitive private data like passwords, OTPs, PINs, or full payment numbers.
+
+        Use situations (Choose two reasons):
+        1. Complex account/payment dispute or explicit user request for a human supervisor.
+        2. Technical issue/system error repeated multiple times despite troubleshooting steps.
+
+        Args:
+            who: Identity or name of caller needing help (e.g. 'Ramesh', 'Street vendor #102').
+            what: Concise summary of what happened.
+            checked: What steps or tools the agent already checked/attempted.
+            urgency: Urgency level ('low', 'medium', or 'high').
+            language: Caller's language (e.g., 'English', 'Tamil', 'Hindi').
+            follow_up: Preferred follow-up method (e.g. 'phone', 'email', 'chat').
+            user_permission_granted: Must be True ONLY IF the caller explicitly gave permission to share their details.
+        """
+        from human_help import create_escalation
+        logger.info(f"Triggering create_human_escalation tool for {who}, permission_granted={user_permission_granted}")
+        res = create_escalation(
+            who=who,
+            what=what,
+            checked=checked,
+            urgency=urgency,
+            language=language,
+            follow_up=follow_up,
+            user_permission_granted=user_permission_granted,
+        )
+        if res.get("status") == "cancelled":
+            return res["message"]
+        return f"Human help request created successfully. Reference ID: {res['reference_id']}. {res['next_step_message']}"
+
+
 
 server = AgentServer()
 
