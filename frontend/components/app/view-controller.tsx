@@ -1,7 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Loader2Icon, PhoneCallIcon, BarChart3Icon } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import {
+  Loader2Icon,
+  PhoneCallIcon,
+  BarChart3Icon,
+  PhoneIcon,
+  AlertTriangleIcon,
+  ShieldAlertIcon,
+  BookOpenIcon,
+} from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { AnimatePresence, motion } from 'motion/react';
 import { ConnectionState } from 'livekit-client';
@@ -10,29 +18,88 @@ import type { AppConfig } from '@/app-config';
 import { AgentSessionView_01 } from '@/components/agents-ui/blocks/agent-session-view-01';
 import { WelcomeView } from '@/components/app/welcome-view';
 import { CallAnalyticsDashboard } from '@/components/app/dashboard-view';
+import { PostCallFeedbackView } from '@/components/app/post-call-feedback';
+import {
+  ComplaintHelplinePanel,
+  OpenEscalationsPanel,
+  FraudPreventionPanel,
+  SchemesSearchPanel,
+} from '@/components/app/info-panels';
 import { Button } from '@/components/ui/button';
 
 const MotionWelcomeView = motion.create(WelcomeView);
 const MotionSessionView = motion.create(AgentSessionView_01);
 const MotionDashboardView = motion.create(CallAnalyticsDashboard);
+const MotionPostCallFeedback = motion.create(PostCallFeedbackView);
+const MotionComplaintHelpline = motion.create(ComplaintHelplinePanel);
+const MotionOpenEscalations = motion.create(OpenEscalationsPanel);
+const MotionFraudPrevention = motion.create(FraudPreventionPanel);
+const MotionSchemesSearch = motion.create(SchemesSearchPanel);
 
 const VIEW_MOTION_PROPS = {
   variants: {
-    visible: {
-      opacity: 1,
-    },
-    hidden: {
-      opacity: 0,
-    },
+    visible: { opacity: 1, y: 0 },
+    hidden: { opacity: 0, y: 12 },
   },
   initial: 'hidden',
   animate: 'visible',
   exit: 'hidden',
-  transition: {
-    duration: 0.5,
-    ease: 'linear',
-  },
+  transition: { duration: 0.4, ease: 'easeOut' },
 };
+
+type ActiveTab =
+  | 'assistant'
+  | 'dashboard'
+  | 'helpline'
+  | 'escalations'
+  | 'fraud'
+  | 'schemes';
+
+interface NavTab {
+  id: ActiveTab;
+  label: string;
+  shortLabel: string;
+  icon: React.ReactNode;
+}
+
+const NAV_TABS: NavTab[] = [
+  {
+    id: 'assistant',
+    label: 'Voice Assistant',
+    shortLabel: 'Assistant',
+    icon: <PhoneCallIcon className="w-3.5 h-3.5" />,
+  },
+  {
+    id: 'dashboard',
+    label: 'Call Analytics',
+    shortLabel: 'Analytics',
+    icon: <BarChart3Icon className="w-3.5 h-3.5" />,
+  },
+  {
+    id: 'helpline',
+    label: 'Complaint Helpline',
+    shortLabel: 'Helpline',
+    icon: <PhoneIcon className="w-3.5 h-3.5" />,
+  },
+  {
+    id: 'escalations',
+    label: 'Open Escalations',
+    shortLabel: 'Escalations',
+    icon: <AlertTriangleIcon className="w-3.5 h-3.5" />,
+  },
+  {
+    id: 'fraud',
+    label: 'Fraud Prevention',
+    shortLabel: 'Fraud',
+    icon: <ShieldAlertIcon className="w-3.5 h-3.5" />,
+  },
+  {
+    id: 'schemes',
+    label: 'Schemes Search',
+    shortLabel: 'Schemes',
+    icon: <BookOpenIcon className="w-3.5 h-3.5" />,
+  },
+];
 
 interface ViewControllerProps {
   appConfig: AppConfig;
@@ -43,9 +110,30 @@ export function ViewController({ appConfig }: ViewControllerProps) {
   const isConnecting = connectionState === ConnectionState.Connecting;
   const { resolvedTheme } = useTheme();
   const [micError, setMicError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'assistant' | 'dashboard'>('assistant');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('assistant');
 
-  // Detect mic permission errors proactively on the welcome screen
+  // ── Post-call feedback state ───────────────────────────────────────────────
+  // showPostCall becomes true when a call that WAS connected has now ended.
+  const [showPostCall, setShowPostCall] = useState(false);
+  const wasConnectedRef = useRef(false);
+
+  useEffect(() => {
+    if (isConnected) {
+      // Mark that a call was active
+      wasConnectedRef.current = true;
+    } else if (wasConnectedRef.current) {
+      // Call just ended — show the post-call feedback screen
+      wasConnectedRef.current = false;
+      setShowPostCall(true);
+    }
+  }, [isConnected]);
+
+  const handleFeedbackDone = () => {
+    setShowPostCall(false);
+    setActiveTab('assistant');
+  };
+
+  // ── Mic permission check ───────────────────────────────────────────────────
   useEffect(() => {
     if (typeof navigator === 'undefined' || !navigator.permissions) return;
     navigator.permissions
@@ -89,35 +177,39 @@ export function ViewController({ appConfig }: ViewControllerProps) {
 
   return (
     <div className="flex flex-col min-h-screen w-full">
-      {/* Top Header Navigation for Switching between Voice Assistant & Call Dashboard */}
-      {!isConnected && !isConnecting && (
+      {/* Top Header Navigation — hidden during call and post-call */}
+      {!isConnected && !isConnecting && !showPostCall && (
         <div className="sticky top-0 z-50 flex items-center justify-center p-3 bg-background/80 backdrop-blur-md border-b border-border/60">
-          <div className="flex items-center gap-1.5 p-1 bg-muted/60 rounded-full border border-border/50 shadow-inner">
-            <Button
-              variant={activeTab === 'assistant' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setActiveTab('assistant')}
-              className="rounded-full text-xs font-semibold px-4 gap-1.5 transition-all"
-            >
-              <PhoneCallIcon className="w-3.5 h-3.5" />
-              Voice Assistant
-            </Button>
-            <Button
-              variant={activeTab === 'dashboard' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setActiveTab('dashboard')}
-              className="rounded-full text-xs font-semibold px-4 gap-1.5 transition-all"
-            >
-              <BarChart3Icon className="w-3.5 h-3.5" />
-              Call Analytics Dashboard
-            </Button>
+          <div className="flex items-center gap-1 p-1 bg-muted/60 rounded-full border border-border/50 shadow-inner overflow-x-auto max-w-full scrollbar-hide">
+            {NAV_TABS.map((tab) => (
+              <Button
+                key={tab.id}
+                variant={activeTab === tab.id ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setActiveTab(tab.id)}
+                className="rounded-full text-xs font-semibold px-3 sm:px-4 gap-1.5 transition-all flex-shrink-0 whitespace-nowrap"
+              >
+                {tab.icon}
+                <span className="hidden sm:inline">{tab.label}</span>
+                <span className="sm:hidden">{tab.shortLabel}</span>
+              </Button>
+            ))}
           </div>
         </div>
       )}
 
       <AnimatePresence mode="wait">
-        {/* Welcome view */}
-        {!isConnected && !isConnecting && activeTab === 'assistant' && (
+        {/* ── Post-call feedback screen (takes priority over everything) ── */}
+        {showPostCall && !isConnected && !isConnecting && (
+          <MotionPostCallFeedback
+            key="post-call-feedback"
+            {...VIEW_MOTION_PROPS}
+            onDone={handleFeedbackDone}
+          />
+        )}
+
+        {/* ── Welcome / Voice Assistant view ── */}
+        {!showPostCall && !isConnected && !isConnecting && activeTab === 'assistant' && (
           <MotionWelcomeView
             key="welcome"
             {...VIEW_MOTION_PROPS}
@@ -127,12 +219,32 @@ export function ViewController({ appConfig }: ViewControllerProps) {
           />
         )}
 
-        {/* Dashboard view */}
-        {!isConnected && !isConnecting && activeTab === 'dashboard' && (
+        {/* ── Call Analytics Dashboard ── */}
+        {!showPostCall && !isConnected && !isConnecting && activeTab === 'dashboard' && (
           <MotionDashboardView key="dashboard" {...VIEW_MOTION_PROPS} />
         )}
 
-        {/* Connecting overlay */}
+        {/* ── Complaint Helpline ── */}
+        {!showPostCall && !isConnected && !isConnecting && activeTab === 'helpline' && (
+          <MotionComplaintHelpline key="helpline" {...VIEW_MOTION_PROPS} />
+        )}
+
+        {/* ── Open Escalations ── */}
+        {!showPostCall && !isConnected && !isConnecting && activeTab === 'escalations' && (
+          <MotionOpenEscalations key="escalations" {...VIEW_MOTION_PROPS} />
+        )}
+
+        {/* ── Fraud Prevention ── */}
+        {!showPostCall && !isConnected && !isConnecting && activeTab === 'fraud' && (
+          <MotionFraudPrevention key="fraud" {...VIEW_MOTION_PROPS} />
+        )}
+
+        {/* ── Schemes Search ── */}
+        {!showPostCall && !isConnected && !isConnecting && activeTab === 'schemes' && (
+          <MotionSchemesSearch key="schemes" {...VIEW_MOTION_PROPS} />
+        )}
+
+        {/* ── Connecting overlay ── */}
         {isConnecting && !isConnected && (
           <motion.div
             key="connecting"
@@ -165,7 +277,7 @@ export function ViewController({ appConfig }: ViewControllerProps) {
           </motion.div>
         )}
 
-        {/* Session view */}
+        {/* ── Live session view ── */}
         {isConnected && (
           <MotionSessionView
             key="session-view"
@@ -194,5 +306,3 @@ export function ViewController({ appConfig }: ViewControllerProps) {
     </div>
   );
 }
-
-

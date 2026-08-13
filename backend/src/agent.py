@@ -1,8 +1,3 @@
-from asyncio import base_events
-from asyncio import base_events
-from asyncio import base_events
-from asyncio import base_events
-from asyncio import base_events
 import logging
 
 # pyrefly: ignore [missing-import]
@@ -35,10 +30,48 @@ logger = logging.getLogger("agent")
 load_dotenv(".env.local")
 
 
+# Goodbye phrases across English, Tamil, and Tanglish
+GOODBYE_PHRASES = [
+    "bye", "goodbye", "good bye", "see you", "see ya", "catch you later",
+    "talk later", "thank you bye", "thanks bye", "take care", "have a good day",
+    "have a nice day", "good night", "good evening", "ok bye", "ok thanks",
+    "okay bye", "okay thanks", "nandri", "poitten", "poi varen", "seri bye",
+    "vanakkam bye", "adios", "cheers", "later", "tataa", "tata",
+]
+
+
 class Assistant(Agent):
-    def __init__(self, is_outbound: bool = False) -> None:
+    def __init__(self, session_stats: dict, is_outbound: bool = False) -> None:
         instructions = OUTBOUND_SYSTEM_PROMPT if is_outbound else SYSTEM_PROMPT
         super().__init__(instructions=instructions)
+        # Shared mutable dict with the my_agent closure for farewell state
+        self._session_stats = session_stats
+
+    @function_tool
+    async def collect_farewell_feedback(
+        self,
+        context: RunContext,
+        rating: str,
+        feedback_comment: str = "",
+    ):
+        """Call this tool ONLY when the caller is saying goodbye or signing off.
+        Ask the caller for a quick rating (1-5 or Excellent/Good/Ok/Poor) and
+        any optional comment, then use this tool to record it before ending the call.
+
+        After calling this tool, say a warm farewell and end naturally.
+
+        Args:
+            rating: Caller's satisfaction rating (e.g., '5', 'Excellent', 'Good', 'Ok', 'Poor').
+            feedback_comment: Optional caller comment or suggestion (e.g., 'Very helpful, explained PM Kisan scheme clearly').
+        """
+        logger.info(f"Farewell feedback collected — rating={rating!r}, comment={feedback_comment!r}")
+        self._session_stats["farewell_rating"] = rating
+        self._session_stats["farewell_comment"] = feedback_comment
+        self._session_stats["graceful_goodbye"] = True
+        return (
+            f"Thank you for your feedback! Rating: {rating}."
+            " It was a pleasure helping you. Have a wonderful day!"
+        )
 
     @function_tool
     async def get_current_weather(self, context: RunContext, city: str):
@@ -264,7 +297,16 @@ async def my_agent(ctx: JobContext):
     import time
     call_id = f"call_{ctx.room.name}_{int(time.time())}"
     record_call_start(call_id=call_id, room_name=ctx.room.name)
-    session_stats = {"turns": 0, "recorded": False}
+    # session_stats is the single source of truth for this call's runtime state
+    session_stats = {
+        "turns": 0,
+        "recorded": False,
+        "graceful_goodbye": False,
+        "farewell_prompted": False,
+        "farewell_rating": None,
+        "farewell_comment": "",
+        "agent_greeted": False,   # True once session.start() + ctx.connect() succeed
+    }
 
     # Set up a voice AI pipeline using Murf Falcon, Gemini, Deepgram, and the LiveKit turn detector
     session = AgentSession(
@@ -290,6 +332,17 @@ async def my_agent(ctx: JobContext):
         if not transcript:
             return
 
+        # ── Goodbye / farewell detection ──────────────────────────────────────
+        is_goodbye = any(phrase in transcript for phrase in GOODBYE_PHRASES)
+        if is_goodbye and not session_stats["farewell_prompted"]:
+            session_stats["farewell_prompted"] = True
+            logger.info(f"Goodbye phrase detected in: '{ev.transcript}'. Prompting for feedback.")
+            # Pre-emptively mark graceful goodbye so that even if the caller
+            # hangs up before rating us the call is still SUCCESS (not FAILED).
+            if session_stats["turns"] >= 1:
+                session_stats["graceful_goodbye"] = True
+
+        # ── Language / TTS voice switching ────────────────────────────────────
         # Check for Baloo Thambi 2 script characters (native tamil)
         has_baloo_thambi_2 = any(ord(c) >= 0x0900 and ord(c) <= 0x092F for c in transcript)
 
@@ -315,7 +368,7 @@ async def my_agent(ctx: JobContext):
     try:
         # Start the session, which initializes the voice pipeline and warms up the models
         await session.start(
-            agent=Assistant(is_outbound=is_outbound_call),
+            agent=Assistant(session_stats=session_stats, is_outbound=is_outbound_call),
             room=ctx.room,
             room_options=room_io.RoomOptions(
                 audio_input=room_io.AudioInputOptions(
@@ -331,6 +384,11 @@ async def my_agent(ctx: JobContext):
 
         # Join the room and connect to the user
         await ctx.connect()
+
+        # Session started and agent is live — mark as greeted
+        # (even 0 user turns = caller connected and heard the greeting)
+        session_stats["agent_greeted"] = True
+        logger.info(f"Agent greeted caller in room {ctx.room.name}")
 
         if is_outbound_call:
             logger.info("Outbound call connected. Speaking mandatory 3-part opening statement...")
@@ -350,12 +408,29 @@ async def my_agent(ctx: JobContext):
     finally:
         if not session_stats["recorded"]:
             turns = session_stats["turns"]
-            if turns >= 1:
+            graceful = session_stats["graceful_goodbye"]
+            rating = session_stats["farewell_rating"]
+            comment = session_stats["farewell_comment"]
+
+            if graceful and turns >= 1:
+                outcome = "success"
+                reason_parts = ["Caller signed off gracefully after conversation"]
+                if rating:
+                    reason_parts.append(f"Rating: {rating}")
+                if comment:
+                    reason_parts.append(f"Feedback: {comment}")
+                reason = " | ".join(reason_parts)
+            elif turns >= 1:
                 outcome = "success"
                 reason = "Inquiry completed / active interactive dialogue turns recorded"
+            elif session_stats["agent_greeted"]:
+                # Agent greeted the caller — caller connected but signed off
+                # without speaking. Count as success (not a disconnect failure).
+                outcome = "success"
+                reason = "Agent greeted caller — caller signed off without verbal interaction"
             else:
                 outcome = "failed"
-                reason = "Caller disconnected before interactive conversation"
+                reason = "Session error or caller disconnected before agent greeting"
 
             update_call_outcome(
                 call_id=call_id,
@@ -364,13 +439,7 @@ async def my_agent(ctx: JobContext):
                 turns=turns,
             )
             session_stats["recorded"] = True
-            logger.info(f"Recorded call outcome for {call_id}: {outcome} (turns={turns})")
-
-
-if __name__ == "__main__":
-    cli.run_app(server)
-
-
+            logger.info(f"Recorded call outcome for {call_id}: {outcome} (turns={turns}, graceful={graceful})")
 
 
 if __name__ == "__main__":

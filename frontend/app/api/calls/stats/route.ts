@@ -12,7 +12,16 @@ async function getDb() {
   // sql.js is a pure-WASM SQLite port — no native compilation required
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const initSqlJs = require('sql.js');
-  const SQL = await initSqlJs();
+  const wasmPath = path.resolve(
+    process.cwd(),
+    'node_modules',
+    'sql.js',
+    'dist',
+    'sql-wasm.wasm'
+  );
+  const SQL = await initSqlJs({
+    locateFile: () => wasmPath,
+  });
 
   const dbPath = getDbPath();
   let db: any;
