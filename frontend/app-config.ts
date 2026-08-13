@@ -33,9 +33,9 @@ export interface AppConfig {
 }
 
 export const APP_CONFIG_DEFAULTS: AppConfig = {
-  companyName: 'Kathirvelan Karthik AI',
-  pageTitle: 'Kathirvelan Karthik - Digital Voice Assistant',
-  pageDescription: 'Your friendly digital financial assistant powered by AI',
+  companyName: 'Namma Kadai AI',
+  pageTitle: 'Namma Kadai AI - Voice Agent',
+  pageDescription: 'Namma Kadai Voice Agent',
 
   supportsChatInput: true,
   supportsVideoInput: true,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Loader2Icon } from 'lucide-react';
+import { Loader2Icon, PhoneCallIcon, BarChart3Icon } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { AnimatePresence, motion } from 'motion/react';
 import { ConnectionState } from 'livekit-client';
@@ -9,9 +9,12 @@ import { useSessionContext } from '@livekit/components-react';
 import type { AppConfig } from '@/app-config';
 import { AgentSessionView_01 } from '@/components/agents-ui/blocks/agent-session-view-01';
 import { WelcomeView } from '@/components/app/welcome-view';
+import { CallAnalyticsDashboard } from '@/components/app/dashboard-view';
+import { Button } from '@/components/ui/button';
 
 const MotionWelcomeView = motion.create(WelcomeView);
 const MotionSessionView = motion.create(AgentSessionView_01);
+const MotionDashboardView = motion.create(CallAnalyticsDashboard);
 
 const VIEW_MOTION_PROPS = {
   variants: {
@@ -40,6 +43,7 @@ export function ViewController({ appConfig }: ViewControllerProps) {
   const isConnecting = connectionState === ConnectionState.Connecting;
   const { resolvedTheme } = useTheme();
   const [micError, setMicError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'assistant' | 'dashboard'>('assistant');
 
   // Detect mic permission errors proactively on the welcome screen
   useEffect(() => {
@@ -68,7 +72,6 @@ export function ViewController({ appConfig }: ViewControllerProps) {
   }, []);
 
   const handleStartCall = async () => {
-    // Try to get mic access before connecting; catch permission errors
     try {
       await navigator.mediaDevices.getUserMedia({ audio: true });
       setMicError(null);
@@ -78,85 +81,118 @@ export function ViewController({ appConfig }: ViewControllerProps) {
         setMicError(
           'Microphone access was denied. Please allow microphone access in your browser to use the voice agent.'
         );
-        return; // Don't connect without mic
+        return;
       }
-      // Other errors (no device, etc.) – still proceed; agent can handle
     }
     start();
   };
 
   return (
-    <AnimatePresence mode="wait">
-      {/* Welcome view */}
+    <div className="flex flex-col min-h-screen w-full">
+      {/* Top Header Navigation for Switching between Voice Assistant & Call Dashboard */}
       {!isConnected && !isConnecting && (
-        <MotionWelcomeView
-          key="welcome"
-          {...VIEW_MOTION_PROPS}
-          startButtonText={appConfig.startButtonText}
-          onStartCall={handleStartCall}
-          micError={micError}
-        />
-      )}
-
-      {/* Connecting overlay */}
-      {isConnecting && !isConnected && (
-        <motion.div
-          key="connecting"
-          {...VIEW_MOTION_PROPS}
-          className="flex min-h-screen w-full flex-col items-center justify-center px-4"
-        >
-          <div className="bg-card/80 backdrop-blur-md border border-border flex w-full max-w-sm flex-col items-center justify-center rounded-3xl p-10 text-center shadow-2xl gap-5">
-            <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-primary/10">
-              <Loader2Icon className="h-10 w-10 text-primary animate-spin" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-foreground">Connecting…</h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                The agent is joining the call, please wait
-              </p>
-            </div>
-            <div className="flex items-center gap-1.5 mt-2">
-              {[0, 1, 2].map((i) => (
-                <span
-                  key={i}
-                  className="h-2 w-2 rounded-full bg-primary"
-                  style={{
-                    animation: 'bounce-dot 1.2s infinite ease-in-out',
-                    animationDelay: `${i * 0.2}s`,
-                  }}
-                />
-              ))}
-            </div>
+        <div className="sticky top-0 z-50 flex items-center justify-center p-3 bg-background/80 backdrop-blur-md border-b border-border/60">
+          <div className="flex items-center gap-1.5 p-1 bg-muted/60 rounded-full border border-border/50 shadow-inner">
+            <Button
+              variant={activeTab === 'assistant' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setActiveTab('assistant')}
+              className="rounded-full text-xs font-semibold px-4 gap-1.5 transition-all"
+            >
+              <PhoneCallIcon className="w-3.5 h-3.5" />
+              Voice Assistant
+            </Button>
+            <Button
+              variant={activeTab === 'dashboard' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setActiveTab('dashboard')}
+              className="rounded-full text-xs font-semibold px-4 gap-1.5 transition-all"
+            >
+              <BarChart3Icon className="w-3.5 h-3.5" />
+              Call Analytics Dashboard
+            </Button>
           </div>
-        </motion.div>
+        </div>
       )}
 
-      {/* Session view */}
-      {isConnected && (
-        <MotionSessionView
-          key="session-view"
-          {...VIEW_MOTION_PROPS}
-          supportsChatInput={appConfig.supportsChatInput}
-          supportsVideoInput={appConfig.supportsVideoInput}
-          supportsScreenShare={appConfig.supportsScreenShare}
-          isPreConnectBufferEnabled={appConfig.isPreConnectBufferEnabled}
-          audioVisualizerType={appConfig.audioVisualizerType}
-          audioVisualizerColor={
-            resolvedTheme === 'dark'
-              ? appConfig.audioVisualizerColorDark
-              : appConfig.audioVisualizerColor
-          }
-          audioVisualizerColorShift={appConfig.audioVisualizerColorShift}
-          audioVisualizerBarCount={appConfig.audioVisualizerBarCount}
-          audioVisualizerGridRowCount={appConfig.audioVisualizerGridRowCount}
-          audioVisualizerGridColumnCount={appConfig.audioVisualizerGridColumnCount}
-          audioVisualizerRadialBarCount={appConfig.audioVisualizerRadialBarCount}
-          audioVisualizerRadialRadius={appConfig.audioVisualizerRadialRadius}
-          audioVisualizerWaveLineWidth={appConfig.audioVisualizerWaveLineWidth}
-          className="fixed inset-0"
-        />
-      )}
-    </AnimatePresence>
+      <AnimatePresence mode="wait">
+        {/* Welcome view */}
+        {!isConnected && !isConnecting && activeTab === 'assistant' && (
+          <MotionWelcomeView
+            key="welcome"
+            {...VIEW_MOTION_PROPS}
+            startButtonText={appConfig.startButtonText}
+            onStartCall={handleStartCall}
+            micError={micError}
+          />
+        )}
+
+        {/* Dashboard view */}
+        {!isConnected && !isConnecting && activeTab === 'dashboard' && (
+          <MotionDashboardView key="dashboard" {...VIEW_MOTION_PROPS} />
+        )}
+
+        {/* Connecting overlay */}
+        {isConnecting && !isConnected && (
+          <motion.div
+            key="connecting"
+            {...VIEW_MOTION_PROPS}
+            className="flex min-h-screen w-full flex-col items-center justify-center px-4"
+          >
+            <div className="bg-card/80 backdrop-blur-md border border-border flex w-full max-w-sm flex-col items-center justify-center rounded-3xl p-10 text-center shadow-2xl gap-5">
+              <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-primary/10">
+                <Loader2Icon className="h-10 w-10 text-primary animate-spin" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-foreground">Connecting…</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  The agent is joining the call, please wait
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5 mt-2">
+                {[0, 1, 2].map((i) => (
+                  <span
+                    key={i}
+                    className="h-2 w-2 rounded-full bg-primary"
+                    style={{
+                      animation: 'bounce-dot 1.2s infinite ease-in-out',
+                      animationDelay: `${i * 0.2}s`,
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Session view */}
+        {isConnected && (
+          <MotionSessionView
+            key="session-view"
+            {...VIEW_MOTION_PROPS}
+            supportsChatInput={appConfig.supportsChatInput}
+            supportsVideoInput={appConfig.supportsVideoInput}
+            supportsScreenShare={appConfig.supportsScreenShare}
+            isPreConnectBufferEnabled={appConfig.isPreConnectBufferEnabled}
+            audioVisualizerType={appConfig.audioVisualizerType}
+            audioVisualizerColor={
+              resolvedTheme === 'dark'
+                ? appConfig.audioVisualizerColorDark
+                : appConfig.audioVisualizerColor
+            }
+            audioVisualizerColorShift={appConfig.audioVisualizerColorShift}
+            audioVisualizerBarCount={appConfig.audioVisualizerBarCount}
+            audioVisualizerGridRowCount={appConfig.audioVisualizerGridRowCount}
+            audioVisualizerGridColumnCount={appConfig.audioVisualizerGridColumnCount}
+            audioVisualizerRadialBarCount={appConfig.audioVisualizerRadialBarCount}
+            audioVisualizerRadialRadius={appConfig.audioVisualizerRadialRadius}
+            audioVisualizerWaveLineWidth={appConfig.audioVisualizerWaveLineWidth}
+            className="fixed inset-0"
+          />
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
+
 

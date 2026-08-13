@@ -27,7 +27,7 @@ from livekit.agents import (
 from livekit.plugins import murf, silero, google, deepgram, noise_cancellation
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
-from db import get_caller, save_caller
+from db import get_caller, save_caller, record_call_start, update_call_outcome
 from prompt import SYSTEM_PROMPT, OUTBOUND_SYSTEM_PROMPT
 
 logger = logging.getLogger("agent")
@@ -39,7 +39,6 @@ class Assistant(Agent):
     def __init__(self, is_outbound: bool = False) -> None:
         instructions = OUTBOUND_SYSTEM_PROMPT if is_outbound else SYSTEM_PROMPT
         super().__init__(instructions=instructions)
-
 
     @function_tool
     async def get_current_weather(self, context: RunContext, city: str):
@@ -245,7 +244,6 @@ class Assistant(Agent):
         return f"Human help request created successfully. Reference ID: {res['reference_id']}. {res['next_step_message']}"
 
 
-
 server = AgentServer()
 
 
@@ -259,40 +257,35 @@ server.setup_fnc = prewarm
 @server.rtc_session(agent_name="my-agent")
 async def my_agent(ctx: JobContext):
     # Logging setup
-    # Add any other context you want in all log entries here
     ctx.log_context_fields = {
         "room": ctx.room.name,
     }
 
+    import time
+    call_id = f"call_{ctx.room.name}_{int(time.time())}"
+    record_call_start(call_id=call_id, room_name=ctx.room.name)
+    session_stats = {"turns": 0, "recorded": False}
+
     # Set up a voice AI pipeline using Murf Falcon, Gemini, Deepgram, and the LiveKit turn detector
     session = AgentSession(
-        # Speech-to-text (STT) is your agent's ears, turning the user's speech into text that the LLM can understand
-        # See all available models at https://docs.livekit.io/agents/models/stt/
         stt=deepgram.STT(model="nova-3", language="multi"),
-        # A Large Language Model (LLM) is your agent's brain, processing user input and generating a response
-        # See all available models at https://docs.livekit.io/agents/models/llm/
         llm=google.LLM(
             model="gemini-3.5-flash-lite",
         ),
-        # Text-to-speech (TTS) is your agent's voice, turning the LLM's text into speech that the user can hear
-        # See all available models as well as voice selections at https://docs.livekit.io/agents/models/tts/
         tts=murf.TTS(
             voice="ta-IN-anisha",
             style="Conversation",
             tokenizer=tokenize.basic.SentenceTokenizer(min_sentence_len=2),
             text_pacing=True,
         ),
-        # VAD and turn detection are used to determine when the user is speaking and when the agent should respond
-        # See more at https://docs.livekit.io/agents/build/turns
         turn_detection=MultilingualModel(),
         vad=ctx.proc.userdata["vad"],
-        # allow the LLM to generate a response while waiting for the end of turn
-        # See more at https://docs.livekit.io/agents/build/audio/#preemptive-generation
         preemptive_generation=True,
     )
 
     @session.on("user_input_transcribed")
     def on_user_input_transcribed(ev: UserInputTranscribedEvent):
+        session_stats["turns"] += 1
         transcript = ev.transcript.strip().lower()
         if not transcript:
             return
@@ -319,30 +312,64 @@ async def my_agent(ctx: JobContext):
     # Detect if session is an outbound call (via room name or SIP context)
     is_outbound_call = "outbound" in ctx.room.name.lower() or "sip" in ctx.room.name.lower()
 
-    # Start the session, which initializes the voice pipeline and warms up the models
-    await session.start(
-        agent=Assistant(is_outbound=is_outbound_call),
-        room=ctx.room,
-        room_options=room_io.RoomOptions(
-            audio_input=room_io.AudioInputOptions(
-                noise_cancellation=lambda params: (
-                    noise_cancellation.BVCTelephony()
-                    if params.participant.kind
-                    == rtc.ParticipantKind.PARTICIPANT_KIND_SIP
-                    else noise_cancellation.BVC()
+    try:
+        # Start the session, which initializes the voice pipeline and warms up the models
+        await session.start(
+            agent=Assistant(is_outbound=is_outbound_call),
+            room=ctx.room,
+            room_options=room_io.RoomOptions(
+                audio_input=room_io.AudioInputOptions(
+                    noise_cancellation=lambda params: (
+                        noise_cancellation.BVCTelephony()
+                        if params.participant.kind
+                        == rtc.ParticipantKind.PARTICIPANT_KIND_SIP
+                        else noise_cancellation.BVC()
+                    ),
                 ),
             ),
-        ),
-    )
-
-    # Join the room and connect to the user
-    await ctx.connect()
-
-    if is_outbound_call:
-        logger.info("Outbound call connected. Speaking mandatory 3-part opening statement...")
-        await session.say(
-            "Hello! This is Namma Kadai Voice Assistant calling from Indian Local Commerce to confirm your product delivery slot and check market weather conditions. If you wish to stop receiving these calls, simply say stop or hang up at any time."
         )
+
+        # Join the room and connect to the user
+        await ctx.connect()
+
+        if is_outbound_call:
+            logger.info("Outbound call connected. Speaking mandatory 3-part opening statement...")
+            await session.say(
+                "Hello! This is Namma Kadai Voice Assistant calling from Indian Local Commerce to confirm your product delivery slot and check market weather conditions. If you wish to stop receiving these calls, simply say stop or hang up at any time."
+            )
+    except Exception as exc:
+        logger.error(f"Error during call session {call_id}: {exc}")
+        if not session_stats["recorded"]:
+            update_call_outcome(
+                call_id=call_id,
+                outcome="failed",
+                reason=f"Session error: {str(exc)}",
+                turns=session_stats["turns"],
+            )
+            session_stats["recorded"] = True
+    finally:
+        if not session_stats["recorded"]:
+            turns = session_stats["turns"]
+            if turns >= 1:
+                outcome = "success"
+                reason = "Inquiry completed / active interactive dialogue turns recorded"
+            else:
+                outcome = "failed"
+                reason = "Caller disconnected before interactive conversation"
+
+            update_call_outcome(
+                call_id=call_id,
+                outcome=outcome,
+                reason=reason,
+                turns=turns,
+            )
+            session_stats["recorded"] = True
+            logger.info(f"Recorded call outcome for {call_id}: {outcome} (turns={turns})")
+
+
+if __name__ == "__main__":
+    cli.run_app(server)
+
 
 
 

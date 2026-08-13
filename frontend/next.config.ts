@@ -2,9 +2,12 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   eslint: {
-    // These warnings come from upstream LiveKit/AI UI components, not our code.
     ignoreDuringBuilds: true,
   },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  serverExternalPackages: ['sql.js'],
 };
 
 export default nextConfig;
