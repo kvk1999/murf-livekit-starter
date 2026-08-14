@@ -23,7 +23,8 @@ from livekit.plugins import murf, silero, google, deepgram, noise_cancellation
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 from db import get_caller, save_caller, record_call_start, update_call_outcome
-from prompt import SYSTEM_PROMPT, OUTBOUND_SYSTEM_PROMPT
+from livekit.agents.llm import handoff
+from prompt import SYSTEM_PROMPT, OUTBOUND_SYSTEM_PROMPT, SPECIALIST_SYSTEM_PROMPT
 
 logger = logging.getLogger("agent")
 
@@ -40,12 +41,23 @@ GOODBYE_PHRASES = [
 ]
 
 
-class Assistant(Agent):
-    def __init__(self, session_stats: dict, is_outbound: bool = False) -> None:
-        instructions = OUTBOUND_SYSTEM_PROMPT if is_outbound else SYSTEM_PROMPT
-        super().__init__(instructions=instructions)
-        # Shared mutable dict with the my_agent closure for farewell state
-        self._session_stats = session_stats
+class FraudSpecialistAgent(Agent):
+    """Specialist Agent for Cyber Safety & Fraud Prevention."""
+
+    def __init__(self, session_stats: dict = None) -> None:
+        super().__init__(instructions=SPECIALIST_SYSTEM_PROMPT)
+        self._session_stats = session_stats or {}
+
+    async def on_enter(self) -> None:
+        """Invoked immediately after handoff takeover."""
+        logger.info("FraudSpecialistAgent took over the session.")
+        await self.session.generate_reply(
+            instructions=(
+                "Introduce yourself as the Cyber Safety and Fraud Prevention Specialist. "
+                "Reassure the user, acknowledge their concern based on the conversation history, "
+                "and ask them to share any additional details about the incident."
+            )
+        )
 
     @function_tool
     async def collect_farewell_feedback(
@@ -54,6 +66,66 @@ class Assistant(Agent):
         rating: str,
         feedback_comment: str = "",
     ):
+        """Call this tool ONLY when the caller is saying goodbye or signing off.
+        Ask the caller for a quick rating (1-5 or Excellent/Good/Ok/Poor) and
+        any optional comment, then use this tool to record it before ending the call.
+
+        Args:
+            rating: Caller's satisfaction rating (e.g., '5', 'Excellent', 'Good', 'Ok', 'Poor').
+            feedback_comment: Optional caller comment or suggestion.
+        """
+        logger.info(f"Specialist collected farewell feedback — rating={rating!r}, comment={feedback_comment!r}")
+        self._session_stats["farewell_rating"] = rating
+        self._session_stats["farewell_comment"] = feedback_comment
+        self._session_stats["graceful_goodbye"] = True
+        return (
+            f"Thank you for your feedback! Rating: {rating}."
+            " Stay safe online and have a wonderful day!"
+        )
+
+
+class Assistant(Agent):
+    def __init__(self, session_stats: dict, is_outbound: bool = False) -> None:
+        instructions = OUTBOUND_SYSTEM_PROMPT if is_outbound else SYSTEM_PROMPT
+        super().__init__(instructions=instructions)
+        # Shared mutable dict with the my_agent closure for farewell state
+        self._session_stats = session_stats
+
+    @function_tool
+    async def transfer_to_fraud_specialist(self, context: RunContext):
+        """Transfer the active call and conversation to the Cyber Safety & Fraud Prevention Specialist.
+
+        Use this tool when the user reports active financial fraud, unauthorized UPI/bank debits,
+        phishing links, fake loan apps, or compromised account credentials.
+
+        This handoff passes the complete conversation context to the specialist so the user
+        does not need to repeat their problem.
+        """
+        logger.info("Handoff triggered: Transferring call to Cyber Safety & Fraud Prevention Specialist.")
+        
+        # Step 5: Make the handoff clear to the user before switching
+        await context.session.generate_reply(
+            instructions="Say clearly to the user: 'I will connect you to our Cyber Safety and Fraud Prevention Specialist right away.'"
+        )
+
+        # Step 2 & 4: Instantiate specialist agent and transfer control via session.update_agent
+        specialist = FraudSpecialistAgent(session_stats=self._session_stats)
+        context.session.update_agent(specialist)
+
+        # Trigger specialist self-introduction and takeover
+        await specialist.on_enter()
+
+        return "Handoff to Cyber Safety and Fraud Prevention Specialist complete."
+
+
+    @function_tool
+    async def collect_farewell_feedback(
+        self,
+        context: RunContext,
+        rating: str,
+        feedback_comment: str = "",
+    ):
+
         """Call this tool ONLY when the caller is saying goodbye or signing off.
         Ask the caller for a quick rating (1-5 or Excellent/Good/Ok/Poor) and
         any optional comment, then use this tool to record it before ending the call.
