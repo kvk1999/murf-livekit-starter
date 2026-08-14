@@ -23,8 +23,8 @@ from livekit.plugins import murf, silero, google, deepgram, noise_cancellation
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 from db import get_caller, save_caller, record_call_start, update_call_outcome
-from livekit.agents.llm import handoff
 from prompt import SYSTEM_PROMPT, OUTBOUND_SYSTEM_PROMPT, SPECIALIST_SYSTEM_PROMPT
+
 
 logger = logging.getLogger("agent")
 
