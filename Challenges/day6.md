@@ -10,7 +10,7 @@ Welcome to **Day 6** of the **10 Days of Voice Agents — #VoiceForBharat Editio
 * **Step 2: Integrate a Telephony Service**: Connect a telephony service such as Twilio or use **Linphone (SIP)** to power programmable outbound voice calls.
 * **Step 3: Execute the Call**: Have your agent place an automated call to a phone number or SIP client you control and complete a successful interaction.
 * **Step 4: Master the Outbound Opening**: Because outbound calls are unsolicited, the first two sentences must clearly state:
-1. Who is calling (e.g., Kathirvelan Karthik, Digital Financial Assistant).
+1. Who is calling (e.g., Namma Kadai Assistant, Indian Local Commerce Voice Guide).
 2. Why they are calling (e.g., to share an important update regarding government welfare scheme deadlines).
 3. How to opt out or make it stop immediately.
 
