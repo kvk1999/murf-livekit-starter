@@ -6,7 +6,7 @@ Welcome to **Day 7** of the **10 Days of Voice Agents — #VoiceForBharat Editio
 
 ## 🎯 Day 7 Objectives
 
-* **Step 1: Choose Two Reasons for Human Help**: For our **Financial Services / Citizen Assistant** track (Kathirvelan Karthik), the two escalation triggers are:
+* **Step 1: Choose Two Reasons for Human Help**: For our **Local Commerce Voice Guide** track (Namma Kadai Assistant), the two escalation triggers are:
 1. **Possible Fraud / Cybercrime Reporting**: The caller reports unauthorized transactions, UPI fraud, or phishing.
 2. **Complex Scheme Approval / Disputes**: The caller needs an official loan/scheme decision, dispute resolution, or application status that the agent cannot legally or technically provide.
 
