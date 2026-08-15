@@ -6,7 +6,7 @@ Welcome to **Day 8** of the **10 Days of Voice Agents — #VoiceForBharat Editio
 
 ## 🎯 Day 8 Objectives
 
-* **Step 1: Define Call Success**: Align success metrics with the call objectives set on Day 2 for our **Financial Services / Citizen Assistant** track (Kathirvelan Karthik). A call is **successful** if the agent successfully completed its core goal (e.g., provided accurate scheme eligibility details, answered a financial literacy query, or securely generated an escalation/follow-up ticket). A call is **failed** if the caller dropped off early, the session ended due to an unresolved error, or the goal was not met.
+* **Step 1: Define Call Success**: Align success metrics with the call objectives set on Day 2 for our **Local Commerce Voice Guide** track (Namma Kadai Assistant). A call is **successful** if the agent successfully completed its core goal (e.g., provided accurate information about shopkeeper schemes, answered a query about shopkeeper benefits, or securely generated an escalation/follow-up ticket). A call is **failed** if the caller dropped off early, the session ended due to an unresolved error, or the goal was not met.
 * **Step 2: Track and Record Outcomes**: Automatically log the conclusion of every session into our backend SQLite database (`caller_memory.db`), capturing whether the interaction resulted in a success or failure status.
 * **Step 3: Build a Simple Web Dashboard**: Create a clean interface displaying three key performance indicators:
 1. **Total Calls**
