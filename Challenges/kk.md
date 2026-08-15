@@ -1,6 +1,6 @@
-# Kathirvelan Karthik — Digital Financial Assistant Portal
+# Namma Kadai Assistant — Indian Local Commerce Voice Guide
 
-Kathirvelan Karthik is an AI-powered digital financial assistant representing Tamil Nadu, designed to empower citizens with instant guidance on:
+Namma Kadai Assistant is an AI-powered voice assistant for small Indian retailers and shopkeepers, designed to help them with:
 
 * 💰 **Financial Literacy & Guidance**: Understand savings, budgeting, banking, loans, investments, and financial planning.
 
@@ -21,7 +21,7 @@ Built with a clean, light, and professional design theme featuring instant voice
 
 ## Architecture
 
-Kathirvelan Karthik utilizes a low-latency, real-time voice pipeline to communicate with citizens:
+Namma Kadai Assistant utilizes a low-latency, real-time voice pipeline to communicate with citizens:
 
 ```mermaid
 flowchart LR
@@ -150,7 +150,7 @@ cd backend && uv run python src/agent.py dev
 cd frontend && pnpm dev
 ```[cite: 7]
 
-Then open **http://localhost:3000** in your browser[cite: 7]. Click **Start Call**, allow microphone access, and speak to interact with Kathirvelan Karthik[cite: 7, 11].
+Then open **http://localhost:3000** in your browser[cite: 7]. Click **Start Call**, allow microphone access, and speak to interact with Namma Kadai Assistant[cite: 7, 11].
 
 ---
 
@@ -164,7 +164,7 @@ murf-livekit-starter/
 │   ├── src/
 │   │   ├── agent.py            # Agent pipeline and event handlers
 │   │   ├── db.py               # SQLite caller database setup and operations
-│   │   └── prompt.py           # Kathirvelan Karthik system prompt configuration
+│   │   └── prompt.py           # Namma Kadai Assistant system prompt configuration
 │   ├── tests/                  # LLM-judged evaluation suite
 │   ├── pyproject.toml          # Python dependencies (uv)
 │   └── caller_memory.db        # Local SQLite user profile store
